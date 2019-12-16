@@ -1,4 +1,4 @@
-# Eliminating Bias in Treatment Effect EStimation Arising from Adaptively Collected Data
+# Eliminating Bias in Treatment Effect Estimation Arising from Adaptively Collected Data
 
 This repo contains the simulation code and the latest version of my paper.
 
