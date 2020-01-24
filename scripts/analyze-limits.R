@@ -13,7 +13,7 @@ limit_summary <- merge(
 
 limit_summary <- limit_summary[limit == 0, base_welfare := welfare] %>%
     .[, base_welfare := max(base_welfare, na.rm = TRUE), batch_size] %>%
-    .[batch_size == 5000 & !(limit %in% c(0.005, 0.02)), label := scales::percent(limit, accuracy = 1)] %>%
+    .[batch_size == 5000 & !(limit %in% c(0.005, 0.01, 0.02)), label := scales::percent(limit, accuracy = 1)] %>%
     merge(CJ(batch_size = BATCH_SIZES, limit = LIMITS), by = c("batch_size", "limit"), all.y = TRUE)
 
 
@@ -23,6 +23,7 @@ limit_summary[batch_size < 10000] %>%
     scale_y_continuous(breaks = 1 - LIMITS[LIMITS != 0.005], minor_breaks = 1 - LIMITS[LIMITS != 0.005]) +
     labs(y = "Relative expected welfare to (unlimited = 1)")
 saveChart("welfare-by-limits")
+
 
 limit_summary[batch_size < 10000] %>%
     .[, max_welfare := max(welfare, na.rm = TRUE), limit] %>%

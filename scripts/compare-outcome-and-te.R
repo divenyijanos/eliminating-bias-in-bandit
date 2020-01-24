@@ -41,13 +41,11 @@ putTogetherSetupsWithETC <- function(n, sd_values, te = 1) {
 }
 
 labelSetups <- function(setup_comparison, n, type = c("limit", "method")) {
-    setup_comparison %>%
-        .[batch_size == n & setup == "ETC", label := "RCT", by = sd] %>%
-        .[
-            batch_size == dplyr::nth(unique(batch_size), -2) & setup == "limited IPWE",
-            label := scales::percent(limit, accuracy = limit * 100),
-            .(sd, setup_detailed)
-        ]
+    setup_comparison[
+        batch_size == dplyr::nth(unique(batch_size), -2) & setup == "limited IPWE",
+        label := scales::percent(limit, accuracy = limit * 100),
+        .(sd, setup_detailed)
+    ]
 }
 
 createConvexHullData <- function(setup_comparison, chosen_setup, n = 10000) {
@@ -88,6 +86,7 @@ plotWelfareVsMSE <- function(setups, n = 10000, colors = SETUP_COLORS, mse_limit
 
 # Illustration ----------------------------------------------------------------
 
+# batch_size = 1000
 putTogetherSetupsWithETC(10000, 10)[(batch_size == 1000 & limit == 0) | (batch_size == 10000 & setup == "ETC")] %>%
     .[is.na(label), label := setup] %>%
     .[, method := ifelse(label %in% c("RCT", "ETC"), "traditional", "bandit")] %>%
@@ -107,9 +106,33 @@ putTogetherSetupsWithETC(10000, 10)[(batch_size == 1000 & limit == 0) | (batch_s
         legend.text = element_text(size = 8),
         legend.background = element_rect(fill = "white", size = 0)
     )
-saveChart("illustration-welfare-vs-te")
+saveChart("illustration-welfare-vs-te-limited")
 
-setups <- putTogetherSetupsWithETC(10000, 10)[limit == 0 | (batch_size == 10000 & setup == "TE")]
+# TS only
+setups <- putTogetherSetupsWithETC(10000, 10)[limit == 0 & setup == "TE"]
+ggplot(setups, aes(welfare, mse, color = setup, alpha = alpha)) +
+    geom_path(aes(group = setup_detailed), size = 1) +
+    geom_point(aes(shape = (bias < 0.02), size = batch_size)) +
+    geom_label_repel(
+        aes(label = label), box.padding = 1,
+        segment.size = 0.2, point.padding = 0.5, show.legend = FALSE, na.rm = TRUE
+    ) +
+    annotate(
+        "label", x = 5100, y = 1.4,
+        label = "Biased estimates are hollow \nPoint size is proportional to batch size",
+        hjust = 0, size = 8 / .pt, label.size = 0
+    ) +
+    scale_size_continuous(breaks = c(10, 100, 1000), range = c(0.5, 5), guide = FALSE) +
+    scale_shape_manual(values = c(21, 16), guide = FALSE) +
+    scale_color_manual(values = SETUP_COLORS, guide = FALSE) +
+    scale_y_reverse() +
+    coord_cartesian(ylim = c(1.5, 0), xlim = c(5000, 10000)) +
+    labs(y = "MSE")
+saveChart("illustration-welfare-vs-te-batch-size-te-only")
+
+
+# TS + ETC + FBTE
+setups <- putTogetherSetupsWithETC(10000, 10)[(limit == 0 & setup != "IPWE") | (batch_size == 10000 & setup == "TE")]
 ggplot(setups, aes(welfare, mse, color = setup, alpha = alpha)) +
     geom_path(aes(group = setup_detailed), size = 1) +
     geom_point(aes(shape = (bias < 0.02), size = batch_size)) +
@@ -123,16 +146,13 @@ ggplot(setups, aes(welfare, mse, color = setup, alpha = alpha)) +
         hjust = 0, size = 8 / .pt, label.size = 0
     ) +
     annotate(
-        "label", x = 5500, y = 1, label = "IPWE", color = SETUP_COLORS["IPWE"]
-    ) +
-    annotate(
         "label", x = 7500, y = 1, label = "ETC", color = SETUP_COLORS["ETC"]
     ) +
     annotate(
-        "label", x = 9500, y = 1, label = "FBTE", color = SETUP_COLORS["FBTE"]
+        "label", x = 9500, y = 1, label = "TS-FB", color = SETUP_COLORS["FBTE"]
     ) +
     annotate(
-        "label", x = 9500, y = 0, label = "TE", color = SETUP_COLORS["TE"]
+        "label", x = 9500, y = 0, label = "TS", color = SETUP_COLORS["TE"]
     ) +
     scale_size_continuous(breaks = c(10, 100, 1000), range = c(0.5, 5), guide = FALSE) +
     scale_shape_manual(values = c(21, 16), guide = FALSE) +
@@ -172,16 +192,30 @@ ggplot(limited_setups, aes(welfare, mse, color = setup, alpha = alpha))  +
     labs(y = "MSE")
 saveChart("illustration-welfare-vs-te-batch-size-limited")
 
+# EXPERIMENTAL ----------------------------------------------------------------
+p <- ggplot(limited_setups, aes(welfare, mse, color = setup))  +
+    geom_point(aes(size = batch_size)) +
+    geom_path(aes(group = setup_detailed), size = 1) +
+    scale_size_continuous(breaks = c(10, 100, 1000), range = c(0.5, 5), guide = FALSE) +
+    scale_color_manual(values = SETUP_COLORS, guide = FALSE) +
+    scale_y_reverse() +
+    coord_cartesian(ylim = c(1.5, 0), xlim = c(5000, 10000)) +
+    labs(y = "MSE")
+ggplotly(p)
+
 all_setups <- putTogetherSetupsWithETC(10000, 10)[!(setup %in% c("limited TE", "IPWE"))]
 plotWelfareVsMSE(all_setups, mse_limits = c(1.5, 0)) +
     annotate(
         "label", x = 7500, y = 1, label = "ETC", color = SETUP_COLORS["ETC"]
     ) +
     annotate(
-        "label", x = 9500, y = 1, label = "FBTE", color = SETUP_COLORS["FBTE"]
+        "label", x = 9500, y = 1, label = "TS-FB", color = SETUP_COLORS["FBTE"]
     ) +
     annotate(
-        "label", x = 9500, y = 0, label = "TE", color = SETUP_COLORS["TE"]
+        "label", x = 9500, y = 0, label = "TS", color = SETUP_COLORS["TE"]
+    ) +
+    annotate(
+        "text", x = 7000, y = 0.25, label = "LTS-IPW", color = SETUP_COLORS["IPWE"]
     ) +
     annotate(
         "segment", x = 9000, xend = 9000, y = 1.1, yend = 1.4, arrow = arrow(length = unit(0.1,"cm"))

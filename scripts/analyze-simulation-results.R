@@ -17,7 +17,6 @@ welfare0[batch_size <= 5000] %>%
     geom_point(data = welfare0[mean == max_welfare], size = 2) +
     labs(y = "Expected welfare")
 saveChart("welfare-by-batch-size")
-saveChart("welfare-by-batch-size-wide", width = 8)
 
 
 # Traditional mean estimates---------------------------------------------------
@@ -49,7 +48,7 @@ treated_shares <- collectInterimResults("TreatedShareBySetups") %>%
     .[limit == 0 & batch > 1]
 
 treated_shares[batch == 2] %>%
-    .[batch_size == 1000, label := as.character(sd)] %>%
+    .[batch_size == 1000 & sd %in% c(1, 5, 10, 20, 30), label := as.character(sd)] %>%
     plotXYBy("batch_size", "mean", by = "sd", box_padding = 0.05) +
     labs(y = "Average treated share in 2nd batch")
 saveChart("avg-treated-share")
@@ -60,8 +59,19 @@ mean_estimates0[method == "IPWE" & batch_size <= 5000] %>%
     plotXYBy("batch_size", "bias_in_outcome", by = "sd", box_padding = 0.01) +
     facet_grid(. ~ assignment, labeller = label_both) +
     labs(y = "Bias")
-saveChart("bias-in-means-grouped-by-bs", width = 8, format = "png")
+saveChart("bias-in-means-grouped-by-bs", width = 8)
 
+
+# Avg of avgs with limits -----------------------------------------------------
+
+ipwe_by_setups <- tes_by_setups[method == "IPWE" & limit > 0]
+ipwe_by_setups[, label := ""]
+ipwe_by_setups[, min_mse_by_sd := min(mse), sd]
+
+ipwe_by_setups[batch_size <= 5000 & limit %in% c(0.005, 0.02, 0.1, 0.2)] %>%
+    plotXYBy("batch_size", "mse", by = "sd") +
+    labs(y = "MSE") +
+    facet_wrap(~ limit)
 
 # Best batch_size by limit ----------------------------------------------------
 
@@ -73,33 +83,49 @@ welfare_by_setups[batch_size <= 500 & limit > 0] %>%
     geom_point(data = welfare_by_setups[mean == max_welfare & limit > 0]) +
     facet_wrap(~ sd)
 
-welfare_by_setups[limit > 0][order(-mean), .SD[1:3, .(batch_size, limit, mean)], sd]
-welfare_by_setups[limit > 0][order(-mean), .SD[1:3, .(batch_size, limit)], sd] %>%
-    xtable(digits = c(0, 0, 0, 3)) %>%
-    print(booktabs = TRUE, include.rownames = FALSE)
+# Best combinations
+
+welfare_by_setups[limit > 0, max_welfare_by_sd := max(mean), sd]
+welfare_by_setups[mean >= max_welfare_by_sd * 0.999, .N, keyby = sd]
+
+welfare_by_setups[limit > 0 & batch_size < 2000 & sd %in% c(1, 5, 10, 15, 20, 30)] %>%
+    .[order(mean)] %>%
+    ggplot(aes(
+        x = factor(limit, levels = LIMITS, labels = map_chr(LIMITS, ~scales::percent(.x, accuracy = .x*100))),
+        y = factor(batch_size),
+        fill = mean / max_welfare_by_sd,
+        color = (mean >= max_welfare_by_sd * 0.99)
+    )) +
+    geom_tile(size = 0.5) +
+    scale_fill_gradient(
+        low = GRADIENT_LIMITS[2], high = GRADIENT_LIMITS[1],
+        guide = guide_legend(title = "Welfare \nrelative \nto the best", reverse = TRUE, order = 1)
+    ) +
+    scale_color_manual(
+        breaks = TRUE, values = c(NA, MAIN_COLOR), labels = "",
+        guide = guide_legend(title = "Within 1% \nof the best", override.aes = list(fill = NA))
+    ) +
+    theme(legend.title = element_text(size = rel(0.8))) +
+    labs(x = "Limit", y = "Batch size") +
+    facet_wrap(~ sd, labeller = label_bquote(sigma == .(sd)))
+saveChart("best-welfare-combinations", width = 8)
 
 
-minimum_batch_sizes <- data.table(
-    limit = LIMITS,
-    min_batch_size = sapply(
-        LIMITS,
-        function(limit) ifelse(
-            limit > 0,
-            min(BATCH_SIZES[which(BATCH_SIZES * limit >= 1)]),
-            10
-        )
-    )
-)
 
-dt_to_plot <- welfare_by_setups[order(-mean), .SD[1, .(batch_size, mean)], .(sd, limit)] %>%
-    merge(minimum_batch_sizes, by = "limit", all.x = TRUE) %>%
-    .[, limit := factor(limit, labels = c("0%", "0.5%", "1%", "2%", "5%", "10%", "15%", "20%"))]
-ggplot(dt_to_plot, aes(sd, batch_size, color = limit)) +
-    geom_hline(aes(yintercept = min_batch_size), linetype = "dashed") +
-    geom_line(size = 1) +
-    scale_color_manual(values = generateGradientColors(dt_to_plot[, unique(limit)]), guide = FALSE) +
-    scale_x("sd") +
-    scale_y_continuous(breaks = c(10, 100, 200, 500), minor_breaks = BATCH_SIZES) +
-    facet_wrap(~ limit, nrow = 2) +
-    labs(x = bquote(sigma), y = "Best batch size")
-saveChart("best-batch-sizes", width = 8)
+
+ipwe_by_setups[limit > 0 & batch_size < 2000 & sd %in% c(1, 5, 10, 15, 20, 30)] %>%
+    ggplot(aes(
+        x = factor(limit, levels = LIMITS, labels = map_chr(LIMITS, ~scales::percent(.x, accuracy = .x*100))),
+        y = factor(batch_size),
+        fill = mse
+    )) +
+    geom_tile(size = 0.5) +
+    scale_fill_gradient(
+        low = GRADIENT_LIMITS[1], high = GRADIENT_LIMITS[2],
+        breaks = c(0.1, 0.3, 0.5, 1, 10),
+        guide = guide_legend(title = "MSE", reverse = TRUE)
+    ) +
+    theme(legend.title = element_text(size = rel(0.8))) +
+    labs(x = "Limit", y = "Batch size") +
+    facet_wrap(~ sd, labeller = label_bquote(sigma == .(sd)))
+saveChart("best-mse-combinations", width = 8)

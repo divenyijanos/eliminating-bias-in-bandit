@@ -119,11 +119,11 @@ effect_of_first_batch_estimate <- mean_estimates_by_batch[
 
 effect_of_first_batch_estimate %>%
     ggplot(aes(first_batch_estimate, mean_outcome)) +
-    stat_density_2d(aes(fill = stat(level)), geom = "polygon", alpha = 0.5) +
+    geom_hex(bins = 100) +
+    scale_fill_gradient(low = GRADIENT_LIMITS[2], high = GRADIENT_LIMITS[1], guide = FALSE, trans = "log") +
     geom_point(aes(x = assignment, y = assignment), shape = 3) +
-    scale_fill_gradient(low = GRADIENT_LIMITS[1], high = GRADIENT_LIMITS[2], guide = FALSE) +
-    facet_grid(. ~ assignment, labeller = labeller(assignment = c(`0` = "control", `1` = "treatment"))) +
-    labs(x = "First batch mean estimate", y = "Overall mean estimate")
+    labs(x = "First batch mean estimate", y = "Overall mean estimate") +
+    facet_grid(. ~ assignment, labeller = labeller(assignment = c(`0` = "control", `1` = "treatment")))
 saveChart("illustration-first-batch-mean-vs-overall", width = 8)
 
 # ANIMATION -------------------------------------------------------------------
@@ -270,69 +270,3 @@ batch_avgs[, n_batch_both := min(n_batch), run] %>%
 
 
 calculateTE(batch_avgs) %>% summarizeTE(by = NULL)
-
-# By batch size ---------------------------------------------------------------
-
-welfare10 <- collectInterimResults("WelfareBySetups", sd = 10)[limit == 0]
-
-welfare10[, max_welfare := max(mean)]
-ggplot(welfare10, aes(batch_size, mean)) +
-    geom_line(size = 1, color = MAIN_COLOR) +
-    geom_point(data = welfare10[mean == max_welfare], color = MAIN_COLOR) +
-    geom_line(aes(y = median), linetype = "dashed", color = MAIN_COLOR) +
-    geom_ribbon(aes(ymin = q25, ymax = q75), color = NA, fill = MAIN_COLOR, alpha = 0.5) +
-    scale_x_continuous(breaks = c(10, 1000, 2000, 5000, 10000), minor_breaks = BATCH_SIZES) +
-    labs(x = "Batch size", y = "Expected welfare")
-saveChart("illustration-welfare-by-batch-size")
-
-ggplot(welfare10[batch_size <= 500], aes(batch_size, mean)) +
-    geom_line(size = 1, color = MAIN_COLOR) +
-    geom_point(data = welfare10[mean == max_welfare], color = MAIN_COLOR) +
-    geom_line(aes(y = median), linetype = "dashed", color = MAIN_COLOR) +
-    geom_ribbon(aes(ymin = q25, ymax = q75), color = NA, fill = MAIN_COLOR, alpha = 0.5) +
-    scale_x_continuous(breaks = c(10, 50, 100, 200, 500), minor_breaks = BATCH_SIZES) +
-    labs(x = "Batch size", y = "Expected welfare")
-saveChart("illustration-welfare-by-batch-size-focused")
-
-welfare_accumulation_10 <- collectInterimResults("WelfareAccumulationBySetups", sd = 10) %>%
-    .[limit == 0]
-
-welfare_accumulation_10[batch_size <= 1000 & batch1000 <= 2] %>%
-    .[batch1000 == 1 & batch_size %in% c(10, 100, 1000), label := as.character(batch_size)] %>%
-    ggplot(aes(batch1000 * 1000, inferior_pct / 100, color = factor(batch_size))) +
-    geom_line() +
-    geom_label_repel(
-        aes(label = label), direction = "y", nudge_x = 5,
-        segment.size = 0.2, box.padding = 0.1, hjust = 0, na.rm = TRUE
-    ) +
-    scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
-    scale_color_manual(values = generateGradientColors(BATCH_SIZES[BATCH_SIZES <= 1000]), guide = FALSE) +
-    scale_x_continuous(breaks = c(0, 1000, 2000)) +
-    labs(x = "n", y = "Probability of under-performing random")
-saveChart("stuck-evolution-small-n", width = 1.6)
-
-welfare_accumulation_10[batch_size <= 1000 & batch1000 >= 2] %>%
-    .[batch1000 == 10 & batch_size %in% c(10, 100, 1000), label := as.character(batch_size)] %>%
-    ggplot(aes(batch1000 * 1000, inferior_pct / 100, color = factor(batch_size))) +
-    geom_line() +
-    geom_label_repel(
-        aes(label = label), direction = "y", nudge_x = 5,
-        segment.size = 0.2, box.padding = 0.1, hjust = 0, na.rm = TRUE
-    ) +
-    scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
-    scale_color_manual(values = generateGradientColors(BATCH_SIZES[BATCH_SIZES <= 1000]), guide = FALSE) +
-    scale_x_continuous(breaks = seq(2000, 10000, 1000), expand = expand_scale(mult = c(0.01, 0.05))) +
-    labs(x = "n", y = "")
-saveChart("stuck-evolution-large-n", width = 6.4)
-
-
-tes10 <- collectInterimResults("TEBySetups", sd = 10)[limit == 0 & method != "FBTE"] %>%
-    .[batch_size == 2000, label := method, method]
-
-melt(tes10[, .(batch_size, method, label, Bias = mean - 1, MSE = mse)], measure.vars = c("Bias", "MSE")) %>%
-    plotYVsBatchSize("value", by = "method", colors = rev(TWO_COLOR_SCHEME)) +
-    geom_hline(aes(yintercept = 0), linetype = "dashed") +
-    geom_blank(data = data.table(batch_size = 10, method = "TE", variable = "MSE", value = -0.25)) +  # to adjust x axis
-    labs(y = "") +
-    facet_wrap(~ variable, scale = "free_y")
-saveChart("illustration-estimation-by-batch-size", width = 8)
