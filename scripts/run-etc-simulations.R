@@ -25,7 +25,7 @@ simulateETCWithBatchSize <- function(sd, batch_size, te = 1, n = 10000) {
 }
 
 n <- 10000
-sd_values <- c(10, 15)
+sd_values <- SDS
 
 walk(sd_values, ~{
     sd <- .x

@@ -59,7 +59,7 @@ mean_estimates0[method == "IPWE" & batch_size <= 5000] %>%
     plotXYBy("batch_size", "bias_in_outcome", by = "sd", box_padding = 0.01) +
     facet_grid(. ~ assignment, labeller = label_both) +
     labs(y = "Bias")
-saveChart("bias-in-means-grouped-by-bs", width = 8)
+saveChart("bias-in-ipwe-means-grouped-by-bs", width = 8)
 
 
 # Avg of avgs with limits -----------------------------------------------------
@@ -73,6 +73,11 @@ ipwe_by_setups[batch_size <= 5000 & limit %in% c(0.005, 0.02, 0.1, 0.2)] %>%
     labs(y = "MSE") +
     facet_wrap(~ limit)
 
+ipwe_by_setups %>%
+    plotXYBy("limit", "mse", by = "sd") +
+    labs(y = "MSE") +
+    facet_wrap(~ batch_size)
+
 # Best batch_size by limit ----------------------------------------------------
 
 welfare_by_setups[, max_welfare := max(mean), .(sd, limit)]
@@ -82,6 +87,12 @@ welfare_by_setups[batch_size <= 500 & limit > 0] %>%
     plotXYBy("batch_size", "mean", by = "limit", size = 0.5) +
     geom_point(data = welfare_by_setups[mean == max_welfare & limit > 0]) +
     facet_wrap(~ sd)
+
+welfare_by_setups %>%
+    plotXYBy("limit", "mean", by = "batch_size", size = 0.5) +
+    labs(y = "Expected welfare") +
+    facet_wrap(~ sd)
+
 
 # Best combinations
 
@@ -129,3 +140,37 @@ ipwe_by_setups[limit > 0 & batch_size < 2000 & sd %in% c(1, 5, 10, 15, 20, 30)] 
     labs(x = "Limit", y = "Batch size") +
     facet_wrap(~ sd, labeller = label_bquote(sigma == .(sd)))
 saveChart("best-mse-combinations", width = 8)
+
+
+# SUMMARY TABLES --------------------------------------------------------------
+
+opts_current$set(label = "welfare-summary")
+map(SDS, ~createTableForSetup(n = 10000, ., "welfare", "allocation")) %>%
+    rbindlist() %>%
+    createLatexTableForScenarios(
+        caption = "Expected welfare for different strategies ($n = 10,000$)",
+        footnote = "TS: Thompson sampling, ETC: Explore-then-commit, LTS-X\\\\%: Limited Thompson sampling with X\\\\% limitation. Expected welfare is calculated as the average of the sum of outcomes ($\\\\sum_{i=1}^n Y$) across the simulation runs. Number of simulations = $10,000$ for $\\\\sigma < 10$, $20,000$ for $10 \\\\geq \\\\sigma < 20$ and $50,000$ for $\\\\sigma \\\\geq 20$.",
+        result_file = "table-welfare",
+        by = SDS, by_name = "\\\\sigma"
+    )
+
+opts_current$set(label = "bias-summary")
+map(SDS, ~createTableForSetup(n = 10000, ., "bias", "strategy")) %>%
+    rbindlist() %>%
+    createLatexTableForScenarios(
+        caption = "Bias for different strategies ($n = 10,000$)",
+        footnote = "TS: Thompson sampling with $\\\\hat \\\\tau_0$, TS-IPW: Thompson sampling with $\\\\hat \\\\tau_{IPW}$, TS-FB: Thompson sampling with $\\\\hat \\\\tau_{FB}$, ETC: Explore-then-commit with $\\\\hat \\\\tau_0$, LTS-X\\\\%: Limited Thompson sampling with X\\\\% limitation and $\\\\hat \\\\tau_{IPW}$. Number of simulations = $10,000$ for $\\\\sigma < 10$, $20,000$ for $10 \\\\geq \\\\sigma < 20$ and $50,000$ for $\\\\sigma \\\\geq 20$.",
+        result_file = "table-bias",
+        digits = 3, by = SDS, by_name = "\\\\sigma"
+    )
+
+
+opts_current$set(label = "mse-summary")
+map(SDS, ~createTableForSetup(n = 10000, ., "mse", "strategy")) %>%
+    rbindlist() %>%
+    createLatexTableForScenarios(
+        caption = "MSE for different strategies ($n = 10,000$)",
+        footnote = "TS: Thompson sampling with $\\\\hat \\\\tau_0$, TS-IPW: Thompson sampling with $\\\\hat \\\\tau_{IPW}$, TS-FB: Thompson sampling with $\\\\hat \\\\tau_{FB}$, ETC: Explore-then-commit with $\\\\hat \\\\tau_0$, LTS-X\\\\%: Limited Thompson sampling with X\\\\% limitation and $\\\\hat \\\\tau_{IPW}$. Number of simulations = $10,000$ for $\\\\sigma < 10$, $20,000$ for $10 \\\\geq \\\\sigma < 20$ and $50,000$ for $\\\\sigma \\\\geq 20$.",
+        result_file = "table-mse",
+        digits = 3, by = SDS, by_name = "\\\\sigma"
+    )

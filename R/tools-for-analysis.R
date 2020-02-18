@@ -132,3 +132,77 @@ calculateTreatedShareBySetups <- function(mean_estimates_by_batch) {
     ] %>%
         summarizeMeasure(treated_share, by = c("n", "sd", "batch_size", "limit", "batch"))
 }
+
+putTogetherSetup <- function(n, sd, te = 1) {
+    tes_by_setups <- collectInterimResults("TEBySetups", n = n, sd = sd)
+    welfare_by_setups <- collectInterimResults("WelfareBySetups", n = n, sd = sd)
+
+    merge(
+        tes_by_setups[, .(sd, TE = mean, bias = mean - te, mse, sign_pct, method, batch_size, limit)],
+        welfare_by_setups[, .(welfare = mean, batch_size, limit)],
+        by = c("batch_size", "limit")
+    ) %>%
+    .[, setup := paste0(ifelse(limit == 0, "", "limited "), method)] %>%
+    .[, setup_detailed := paste(setup, limit)]
+}
+
+putTogetherETCSetup <- function(n, sd, te = 1) {
+    etc_tes <- fread(glue("{INTERIM_RESULT_FOLDER}/etc-n{n}-sd{sd}-TEBySetups.csv"))
+    etc_welfare <- fread(glue("{INTERIM_RESULT_FOLDER}/etc-n{n}-sd{sd}-WelfareBySetups.csv"))
+
+    merge(
+        etc_tes[, .(sd, TE = mean, bias = mean - te, mse, batch_size, limit = 0, setup = "ETC", setup_detailed = "ETC")],
+        etc_welfare[, .(welfare = mean, batch_size)],
+        by = c("batch_size")
+    )
+}
+
+putTogetherSetupsWithETC <- function(n, sd_values, te = 1) {
+    setup_comparison <- map(sd_values, ~{
+        rbind(
+            putTogetherSetup(n = n, sd = .x),
+            putTogetherETCSetup(n = n, sd = .x),
+            fill = TRUE
+        )
+    }) %>%
+    rbindlist() %>%  # map_df causes annoying .internal.selfref warning
+    .[, alpha := I(pmax(1 - 2 * abs(bias), 0))] %>%
+    .[order(sd, batch_size, setup)]
+}
+
+createLatexTableForScenarios <- function(table, caption, footnote, result_file, by, by_name, digits = 0) {
+    kable(table, "latex", booktabs = TRUE, longtable = TRUE, caption = caption, digits = digits) %>%
+    add_header_above(c(" ", "Batch size" = 10)) %>%
+    kable_styling(latex_options = c("repeat_header")) %>%
+    pack_rows(
+        index = map_dbl(seq_along(by), ~nrow(table)/length(by)) %>% setNames(map_chr(by, ~glue("${by_name} = {.x}$"))),
+        escape = FALSE, latex_gap_space = "0.5em"
+    ) %>%
+    footnote(footnote, threeparttable = TRUE, general_title = "", escape = FALSE) %>%
+    writeLines(glue("text/{result_file}.txt"))
+}
+
+createTableForSetup <- function(n, sd, measure, by_variable) {
+    cucc <- putTogetherSetupsWithETC(n = n, sd = sd) %>%
+        .[!(setup == "limited TE")] %>%
+        .[, .(sd, batch_size, limit, setup, method, welfare, bias, mse)] %>%
+        .[order(limit, -setup)] %>%
+        .[, allocation := ifelse(
+            setup == "ETC",
+            "ETC",
+            ifelse(limit == 0, "TS", str_remove(glue("LTS-{scales::percent(limit)}"), "\\.0"))
+        )] %>%
+        .[, strategy := ifelse(
+            allocation == "TS" & setup == "FBTE",
+            "TS-FB",
+            ifelse(allocation == "TS" & setup == "IPWE", "TS-IPW", allocation)
+        )] %>%
+        .[, `:=`(
+            allocation = factor(allocation, levels = unique(allocation)),
+            strategy = factor(strategy, levels = unique(strategy))
+        )] %>%
+        .[, .SD, .SDcols = c("batch_size", "limit", measure, by_variable)] %>%
+        unique() %>%
+        dcast(reformulate("batch_size", by_variable), value.var = measure) %>%
+        .[, (length(.)) := map(.SD, ~ifelse(is.na(.), min(., na.rm = TRUE), .)), .SDcols = length(.)]
+}

@@ -82,3 +82,35 @@ welfare0[batch_size <= 500] %>%
     labs(y = "Share of optimal welfare") +
     scale_x_continuous(breaks = c(10, 100, 200, 500), minor_breaks = BATCH_SIZES)
 saveChart("welfare-by-batch-size-across-horizon")
+
+# Summary tables --------------------------------------------------------------
+
+opts_current$set(label = "welfare-summary-horizon")
+map(NS, ~createTableForSetup(n = ., sd = 10, "welfare", "allocation")) %>%
+    rbindlist(fill = TRUE) %>%
+    createLatexTableForScenarios(
+        caption = "Expected welfare for different strategies ($\\sigma = 10$)",
+        footnote = "TS: Thompson sampling, ETC: Explore-then-commit, LTS-X\\\\%: Limited Thompson sampling with X\\\\% limitation. Expected welfare is calculated as the average of the sum of outcomes ($\\\\sum_{i=1}^n Y$) across the simulation runs. Number of simulations = $20,000$ for $n = 10,000$, and $10,000$ otherwise.",
+        result_file = "table-welfare-horizon",
+        by = NS, by_name = "n"
+    )
+
+opts_current$set(label = "bias-summary-horizon")
+map(NS, ~createTableForSetup(n = ., sd = 10, "bias", "strategy")) %>%
+    rbindlist(fill = TRUE) %>%
+    createLatexTableForScenarios(
+        caption = "Bias for different strategies ($\\sigma = 10$)",
+        footnote = "TS: Thompson sampling with $\\\\hat \\\\tau_0$, TS-IPW: Thompson sampling with $\\\\hat \\\\tau_{IPW}$, TS-FB: Thompson sampling with $\\\\hat \\\\tau_{FB}$, ETC: Explore-then-commit with $\\\\hat \\\\tau_0$, LTS-X\\\\%: Limited Thompson sampling with X\\\\% limitation and $\\\\hat \\\\tau_{IPW}$. Number of simulations = $20,000$ for $n = 10,000$, and $10,000$ otherwise.",
+        result_file = "table-bias-horizon",
+        digits = 3, by = NS, by_name = "n"
+    )
+
+opts_current$set(label = "mse-summary-horizon")
+map(NS, ~createTableForSetup(n = ., sd = 10, "mse", "strategy")) %>%
+    rbindlist(fill = TRUE) %>%
+    createLatexTableForScenarios(
+        caption = "MSE for different strategies ($\\sigma = 10$)",
+        footnote = "TS: Thompson sampling with $\\\\hat \\\\tau_0$, TS-IPW: Thompson sampling with $\\\\hat \\\\tau_{IPW}$, TS-FB: Thompson sampling with $\\\\hat \\\\tau_{FB}$, ETC: Explore-then-commit with $\\\\hat \\\\tau_0$, LTS-X\\\\%: Limited Thompson sampling with X\\\\% limitation and $\\\\hat \\\\tau_{IPW}$. Number of simulations = $20,000$ for $n = 10,000$, and $10,000$ otherwise.",
+        result_file = "table-mse-horizon",
+        digits = 3, by = NS, by_name = "n"
+    )
