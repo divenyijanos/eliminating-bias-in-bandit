@@ -8,14 +8,17 @@ library(moments)
 library(ggplot2)
 library(ggrepel)
 library(xtable)
+library(knitr)
+library(kableExtra)
 
 invisible(sapply(list.files("R", full.names = TRUE), source))
 
 options(scipen = 99)
 options(datatable.CJ.names = TRUE)
 options("mc.cores" = 3)
+options(knitr.kable.NA = '')
 
-SDS <- c(1, 2, 5, 10, 15, 20, 30)
+SDS <- c(1, 2, 5, 10, 15, 20, 25, 30)
 BATCH_SIZES <- c(10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000)
 LIMITS <- c(0.005, 0.01, 0.02, 0.05, 0.1, 0.15, 0.2, 0)
 
