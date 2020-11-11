@@ -1,7 +1,5 @@
 source("global.R")
 
-CHART_FORMAT <- "eps"
-
 tes_by_setups <- collectInterimResults("TEBySetups", n = 10000, sd = 10)
 welfare_by_setups <- collectInterimResults("WelfareBySetups", n= 10000, sd = 10)
 
@@ -21,7 +19,7 @@ limit_summary[batch_size < 10000] %>%
     .[, relative_welfare := welfare / base_welfare] %>%
     plotXYBy("batch_size", "relative_welfare", by = "limit", box_padding = 0.01) +
     scale_y_continuous(breaks = 1 - LIMITS[LIMITS != 0.005], minor_breaks = 1 - LIMITS[LIMITS != 0.005]) +
-    labs(y = "Relative expected welfare to (unlimited = 1)")
+    labs(y = "Relative expected welfare (unlimited = 1)")
 saveChart("welfare-by-limits")
 
 
@@ -32,7 +30,7 @@ limit_summary[batch_size < 10000] %>%
 limit_summary[batch_size < 10000] %>%
     plotXYBy("batch_size", "welfare", by = "limit", box_padding = 0.01) +
     scale_y_continuous(breaks = 1 - LIMITS[LIMITS != 0.005], minor_breaks = 1 - LIMITS[LIMITS != 0.005]) +
-    labs(y = "Relative expected welfare to (unlimited = 1)")
+    labs(y = "Relative expected welfare (unlimited = 1)")
 saveChart("absolute-welfare-by-limits")
 
 limit_summary[batch_size < 10000] %>%

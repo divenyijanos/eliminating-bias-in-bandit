@@ -44,7 +44,7 @@ NS <- c(2000, 10000, 20000, 40000)
 welfare0 <- map_df(NS, ~collectInterimResults("WelfareBySetups", sd = 10, n = .x)) %>% .[limit == 0]
 
 etc_welfare <- map_df(NS, ~{
-    datafile <- glue("{INTERIM_RESULT_FOLDER}/etc-n{.x}-sd10-WelfareBySetups.csv")
+    datafile <- glue("{INTERIM_RESULT_FOLDER}/normal/etc-n{.x}-sd10-WelfareBySetups.csv")
     if (file.exists(datafile)) {
         fread(datafile)
     } else {
@@ -53,7 +53,7 @@ etc_welfare <- map_df(NS, ~{
 }) %>% .[batch_size %in% c(1000, 2000)] %>% .[n == 40000, label := paste0("ETC-", batch_size)]
 
 welfare0[batch_size <= 2000] %>%
-    .[n == 40000 & batch_size %in% c(10, 100, 500, 1000, 2000), label := batch_size] %>%
+    .[n == 40000 & batch_size %in% c(10, 1000, 2000), label := batch_size] %>%
     ggplot(aes(n, n - mean, group = factor(batch_size), color = factor(batch_size))) +
     geom_line(size = 1) +
     geom_line(data = etc_welfare, linetype = "dashed", color = THIRD_COLOR) +
@@ -75,12 +75,13 @@ saveChart("expected-regret-by-horizon")
 
 welfare0[, welfare_share := mean / n]
 welfare0[, max_welfare := max(welfare_share), n]
-welfare0[batch_size <= 500] %>%
-    .[batch_size == 500, label := n] %>%
-    plotXYBy("batch_size", "welfare_share", "n", box_padding = 0.05) +
+welfare0[batch_size <= 5000] %>%
+    .[batch_size == 1000 & n <= 10000, label := paste0(n/1000, "k")] %>%
+    .[batch_size == 2000 & n == 20000, label := paste0(n/1000, "k")] %>%
+    .[batch_size == 5000 & n == 40000, label := paste0(n/1000, "k")] %>%
+    plotXYBy("batch_size", "welfare_share", "n", box_padding = 0.05, label_nudge_x = 0) +
     geom_point(data = welfare0[welfare_share == max_welfare]) +
-    labs(y = "Share of optimal welfare") +
-    scale_x_continuous(breaks = c(10, 100, 200, 500), minor_breaks = BATCH_SIZES)
+    labs(y = "Performance relative to the optimal welfare")
 saveChart("welfare-by-batch-size-across-horizon")
 
 # Summary tables --------------------------------------------------------------

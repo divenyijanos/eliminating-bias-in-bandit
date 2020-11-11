@@ -1,20 +1,20 @@
-aggregateSimulations <- function(param_list = NULL, pattern = NULL) {
+aggregateSimulations <- function(param_list = NULL, pattern = NULL, distribution = "normal") {
     if (is.null(param_list) == is.null(pattern)) {
         stop("please specify either params or pattern for simulation files")
     }
     if (is.null(pattern)) {
         pattern <- generateNamePatternFromParams(param_list)
     }
-    aggregated_data <- readInSimulationFiles(pattern = pattern, add_params = FALSE)
+    aggregated_data <- readInSimulationFiles(pattern = pattern, add_params = FALSE, distribution = distribution)
 
-    fwrite(aggregated_data, glue("{SIMULATION_FOLDER}/{pattern}full.csv"))
+    fwrite(aggregated_data, glue("{SIMULATION_FOLDER}/{distribution}/{pattern}full.csv"))
     cat("aggregated file written. Zipping... ")
-    system(glue("gzip {SIMULATION_FOLDER}/{pattern}full.csv"))
+    system(glue("gzip {SIMULATION_FOLDER}/{distribution}/{pattern}full.csv"))
     cat("done.\n")
 }
 
 
-readInSimulationFiles <- function(data_folder = SIMULATION_FOLDER, params = NULL, pattern = NULL, add_params = TRUE) {
+readInSimulationFiles <- function(params = NULL, pattern = NULL, add_params = TRUE, distribution = "normal") {
     if (is.null(params) == is.null(pattern)) {
         stop("please specify either params or pattern for simulation files")
     }
@@ -22,7 +22,7 @@ readInSimulationFiles <- function(data_folder = SIMULATION_FOLDER, params = NULL
         pattern <- pmap_chr(params, ~generateNamePatternFromParams(list(...))) %>%
             glue_collapse("|")
     }
-    files <- list.files(data_folder, pattern = pattern, full.names = TRUE)
+    files <- list.files(glue("{SIMULATION_FOLDER}/{distribution}"), pattern = pattern, full.names = TRUE)
     cat(glue("Reading in {length(files)} simulation file(s)... "))
     data <- map(files, ~{
         if (add_params) {
@@ -47,23 +47,26 @@ extractParamsFromFilename <- function(filename) {
         setnames(params_and_values[, 2])
 }
 
-generateInterimResults <- function(params, calculations, redo = FALSE) {
+generateInterimResults <- function(params, calculations, distribution = "normal", redo = FALSE) {
 
     cat("\n\nCalculating for ")
+    cat(glue("{distribution} distribution, "))
     cat(map_chr(names(params), ~glue("{.x} = {params[.x]}")) %>% glue_collapse(", "))
     cat("... ")
 
     filename_pattern <- generateNamePatternFromParams(params)
 
-    interim_files_exists <- file.exists(generateInterimResultFileName(calculations, filename_pattern))
+    interim_files_exists <- file.exists(generateInterimResultFileName(calculations, filename_pattern, distribution))
     if (redo | !all(interim_files_exists)) {
-        mean_estimates_by_batch <- readInSimulationFiles(pattern = glue("{filename_pattern}"))
+        mean_estimates_by_batch <- readInSimulationFiles(
+            pattern = glue("{filename_pattern}"), distribution = distribution
+        )
         if (nrow(mean_estimates_by_batch) > 0) {
             to_calc <- calculations[redo | !interim_files_exists]
             cat("Running the followings: ", to_calc, "... ")
             walk(to_calc, ~{
                 interim_result <- get(.)(mean_estimates_by_batch)
-                fwrite(interim_result, generateInterimResultFileName(., filename_pattern))
+                fwrite(interim_result, generateInterimResultFileName(., filename_pattern, distribution))
             })
             cat("written to file(s).")
         } else {
@@ -75,8 +78,8 @@ generateInterimResults <- function(params, calculations, redo = FALSE) {
     params
 }
 
-generateInterimResultFileName <- function(calculation, pattern) {
-    glue("{INTERIM_RESULT_FOLDER}/{pattern}{str_remove(calculation, 'calculate')}.csv")
+generateInterimResultFileName <- function(calculation, pattern, distribution = "normal") {
+    glue("{INTERIM_RESULT_FOLDER}/{distribution}/{pattern}{str_remove(calculation, 'calculate')}.csv")
 }
 
 generateNamePatternFromParams <- function(param_list, regex = TRUE) {
@@ -89,11 +92,14 @@ generateNamePatternFromParams <- function(param_list, regex = TRUE) {
     }
 }
 
-collectInterimResults <- function(result_name, te = 1, n = 10000, sd = "[0-9]+", batch_size = "[0-9]+") {
+collectInterimResults <- function(result_name, te = 1, n = 10000, sd = "[0-9]+", batch_size = "[0-9]+", distribution = "normal") {
     param_list <- list(te = te, n = n, sd = sd, batch_size = batch_size)
     pattern <- generateNamePatternFromParams(param_list, regex = FALSE)
     map_df(
-        list.files(INTERIM_RESULT_FOLDER, pattern = glue("{pattern}{result_name}"), full.names = TRUE),
+        list.files(
+            glue("{INTERIM_RESULT_FOLDER}/{distribution}"),
+            pattern = glue("{pattern}{result_name}"), full.names = TRUE
+        ),
         fread
     )
 }

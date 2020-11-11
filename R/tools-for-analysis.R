@@ -25,7 +25,9 @@ summarizeTE <- function(dt, variable = TE, te = 1, by = c("n", "sd", "batch_size
     x <- enexpr(variable)
     additional_aggr <- expr(list(
         sign_pct = mean(!!x < 0) * 100,
-        mse = mean((!!x - !!te)^2)
+        mse = mean((!!x - !!te)^2),
+        mse_q5 = quantile((!!x - !!te)^2, 0.05),
+        mse_q95 = quantile((!!x - !!te)^2, 0.95)
     ))
     summarizeMeasure(dt, !!x, by, additional_aggr)
 }
@@ -133,9 +135,9 @@ calculateTreatedShareBySetups <- function(mean_estimates_by_batch) {
         summarizeMeasure(treated_share, by = c("n", "sd", "batch_size", "limit", "batch"))
 }
 
-putTogetherSetup <- function(n, sd, te = 1) {
-    tes_by_setups <- collectInterimResults("TEBySetups", n = n, sd = sd)
-    welfare_by_setups <- collectInterimResults("WelfareBySetups", n = n, sd = sd)
+putTogetherSetup <- function(n, sd, te = 1, distribution = "normal") {
+    tes_by_setups <- collectInterimResults("TEBySetups", n = n, sd = sd, distribution = distribution)
+    welfare_by_setups <- collectInterimResults("WelfareBySetups", n = n, sd = sd, distribution = distribution)
 
     merge(
         tes_by_setups[, .(sd, TE = mean, bias = mean - te, mse, sign_pct, method, batch_size, limit)],
@@ -146,9 +148,9 @@ putTogetherSetup <- function(n, sd, te = 1) {
     .[, setup_detailed := paste(setup, limit)]
 }
 
-putTogetherETCSetup <- function(n, sd, te = 1) {
-    etc_tes <- fread(glue("{INTERIM_RESULT_FOLDER}/etc-n{n}-sd{sd}-TEBySetups.csv"))
-    etc_welfare <- fread(glue("{INTERIM_RESULT_FOLDER}/etc-n{n}-sd{sd}-WelfareBySetups.csv"))
+putTogetherETCSetup <- function(n, sd, te = 1, distribution = "normal") {
+    etc_tes <- fread(glue("{INTERIM_RESULT_FOLDER}/{distribution}/etc-n{n}-sd{sd}-TEBySetups.csv"))
+    etc_welfare <- fread(glue("{INTERIM_RESULT_FOLDER}/{distribution}/etc-n{n}-sd{sd}-WelfareBySetups.csv"))
 
     merge(
         etc_tes[, .(sd, TE = mean, bias = mean - te, mse, batch_size, limit = 0, setup = "ETC", setup_detailed = "ETC")],
@@ -157,11 +159,11 @@ putTogetherETCSetup <- function(n, sd, te = 1) {
     )
 }
 
-putTogetherSetupsWithETC <- function(n, sd_values, te = 1) {
+putTogetherSetupsWithETC <- function(n, sd_values, te = 1, distribution = "normal") {
     setup_comparison <- map(sd_values, ~{
         rbind(
-            putTogetherSetup(n = n, sd = .x),
-            putTogetherETCSetup(n = n, sd = .x),
+            putTogetherSetup(n = n, sd = .x, distribution = distribution),
+            putTogetherETCSetup(n = n, sd = .x, distribution = distribution),
             fill = TRUE
         )
     }) %>%

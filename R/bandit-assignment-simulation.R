@@ -1,12 +1,18 @@
-simulateParticipants <- function(n = 10000, te = 1, sd = 20) {
+simulateParticipants <- function(n = 10000, te = 1, sd = 20, distribution = "normal") {
     set.seed(sd * 10)
-    noise <- rnorm(n)
+    noise = switch(
+        distribution,
+        normal = rnorm(n),
+        t = rt(n, df = 4),
+        chisq = rchisq(n, df = 5),
+        negchisq = -rchisq(n, df = 5)
+    )
     Y0 <- (noise - mean(noise)) / sd(noise) * sd
     Y1 <- Y0 + te
     data.table(Y0, Y1)
 }
 
-runSimulations <- function(run_from, run_to, participants, batch_size, sd, limit = 0, n_treatment = 1) {
+runSimulations <- function(run_from, run_to, participants, batch_size, sd, limit = 0, n_treatment = 1, distribution = "theoretical") {
     mclapply(seq(run_from, run_to), function(run) {
         set.seed(run)
         cat(glue("{run}."))
@@ -16,7 +22,8 @@ runSimulations <- function(run_from, run_to, participants, batch_size, sd, limit
             batch_size,
             sd,
             limit,
-            n_treatment
+            n_treatment,
+            distribution = distribution
         ) %>%
         .[,
             .(run = run, mean_Y = mean(Y), size = .N),
@@ -25,12 +32,19 @@ runSimulations <- function(run_from, run_to, participants, batch_size, sd, limit
     }) %>% rbindlist()
 }
 
-simulateAssignment <- function(n, participants, batch_size, sd = NULL, limit = 0, n_treatment = 1) {
+simulateAssignment <- function(n, participants, batch_size, sd = NULL, limit = 0, n_treatment = 1, distribution = "theoretical") {
     assignees_up_to_now <- createEmptyAssignees()
-    number_of_batches <- ceiling(n / batch_size)
+    number_of_batches <- floor(n / batch_size)
     for (batch in seq(number_of_batches)) {
+        if (batch == number_of_batches) {
+            batch_size <- n - nrow(assignees_up_to_now)
+        }
         assignment <- getBatchAssignment(assignees_up_to_now, batch_size, sd, limit, n_treatment)
-        assignees_up_to_now <- updateAssignees(assignees_up_to_now, assignment, participants, batch)
+        if (distribution == "theoretical") {
+            assignees_up_to_now <- updateAssignees(assignees_up_to_now, assignment, participants, batch)
+        } else if (distribution == "empirical") {
+            assignees_up_to_now <- addBootstrappedAssignees(assignees_up_to_now, assignment, participants, batch)
+        }
     }
     assignees_up_to_now
 }
@@ -128,4 +142,14 @@ updateAssignees <- function(assignees_up_to_now, assignment, participants, batch
 
 realizeOutcome <- function(assignment, Y0, Y1) {
     assignment * Y1 + (1 - assignment) * Y0
+}
+
+bootstrapFrom <- function(participants, assignees, n) {
+    participants[assignment == assignees][sample(seq(.N), n, replace = TRUE)]
+}
+
+addBootstrappedAssignees <- function(assignees_up_to_now, assignment, participants, batch) {
+    imap_dfr(assignment, ~bootstrapFrom(participants, .y, .x)) %>%
+        .[, .(batch = batch, assignment, Y)] %>%
+        rbind(assignees_up_to_now, .)
 }

@@ -8,9 +8,9 @@ calculateRequiredSampleSize <- function(sd, power = .8, significance = .05) {
 sapply(SDS, calculateRequiredSampleSize) %>% setNames(SDS)
 
 
-simulateETCWithBatchSize <- function(sd, batch_size, te = 1, n = 10000) {
+simulateETCWithBatchSize <- function(sd, batch_size, te = 1, n = 10000, distribution = "normal") {
     params <- list(te = te, n = n, sd = sd, batch_size = batch_size, limit = 0)
-    mean_estimates_by_batch <- readInSimulationFiles(params = params)
+    mean_estimates_by_batch <- readInSimulationFiles(params = params, distribution = distribution)
     if (nrow(mean_estimates_by_batch) > 0) {
         mean_estimates_by_batch[batch == 1, minY := min(mean_Y), run] %>%
             .[mean_Y == minY, loserTreatment := assignment] %>%
@@ -26,18 +26,19 @@ simulateETCWithBatchSize <- function(sd, batch_size, te = 1, n = 10000) {
 
 n <- 10000
 sd_values <- SDS
+distribution <- "normal"
 
 walk(sd_values, ~{
     sd <- .x
     etc_results <- map_df(BATCH_SIZES, ~{
-        simulateETCWithBatchSize(sd = sd, batch_size = .x, n = n)
+        simulateETCWithBatchSize(sd = sd, batch_size = .x, n = n, distribution = distribution)
     })
 
     etc_results[, .(mean_estimate = weighted.mean(mean_Y, w = size)), .(n, sd, batch_size, run, assignment)] %>%
         calculateTE() %>%
         summarizeTE(by = c("n", "sd", "batch_size")) %>%
-        fwrite(glue("{INTERIM_RESULT_FOLDER}/etc-n{n}-sd{sd}-TEBySetups.csv"))
+        fwrite(glue("{INTERIM_RESULT_FOLDER}/{distribution}/etc-n{n}-sd{sd}-TEBySetups.csv"))
     calculateWelfare(etc_results) %>%
         summarizeWelfare(by = c("n", "sd", "batch_size")) %>%
-        fwrite(glue("{INTERIM_RESULT_FOLDER}/etc-n{n}-sd{sd}-WelfareBySetups.csv"))
+        fwrite(glue("{INTERIM_RESULT_FOLDER}/{distribution}/etc-n{n}-sd{sd}-WelfareBySetups.csv"))
 })

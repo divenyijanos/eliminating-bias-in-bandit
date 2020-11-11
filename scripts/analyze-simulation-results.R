@@ -1,18 +1,16 @@
 source("global.R")
 
-CHART_FORMAT <- "eps"
-
 tes_by_setups <- collectInterimResults("TEBySetups")
 welfare_by_setups <- collectInterimResults("WelfareBySetups")
 
 # Outcome ---------------------------------------------------------------------
 
 welfare0 <- welfare_by_setups[limit == 0] %>%
-    .[batch_size == 1000, label := sd]
+    .[batch_size == 500 & sd %in% c(1, 10, 20, 30), label := sd]
 welfare0[, max_welfare := max(mean), by = sd]
 
 welfare0[batch_size <= 5000] %>%
-    plotXYBy("batch_size", "mean", by = "sd") +
+    plotXYBy("batch_size", "mean", by = "sd", box_padding = 0) +
     geom_line(aes(y = 10000 - batch_size / 2), linetype = "dashed") +
     geom_point(data = welfare0[mean == max_welfare], size = 2) +
     labs(y = "Expected welfare")
@@ -27,7 +25,7 @@ mean_estimates0 <- collectInterimResults("MeansBySetups") %>%
     .[, bias_in_outcome := mean - assignment]
 
 mean_estimates0[method == "TE" & batch_size <= 5000] %>%
-    plotXYBy("batch_size", "bias_in_outcome", by = "sd", label_nudge_x = +10, box_padding = 0.01) +
+    plotXYBy("batch_size", "bias_in_outcome", by = "sd", label_nudge_x = 0, box_padding = 0.01) +
     labs(y = "Bias") +
     facet_grid(. ~ assignment, labeller = labeller(assignment = c(`0` = "control", `1` = "treatment")))
 saveChart("bias-in-means", width = 8)
@@ -35,7 +33,7 @@ saveChart("bias-in-means", width = 8)
 
 tes0 <- tes_by_setups %>%
     .[limit == 0] %>%
-    .[batch_size == 1000 & sd %in% c(1, 5, 10, 20, 30), label := sd] %>%
+    .[batch_size == 1000 & sd %in% c(1, 10, 20, 30), label := sd] %>%
     .[, bias_in_te := mean - 1]
 
 tes0[method == "TE" & batch_size <= 5000] %>%
@@ -49,7 +47,7 @@ treated_shares <- collectInterimResults("TreatedShareBySetups") %>%
 
 treated_shares[batch == 2] %>%
     .[batch_size == 1000 & sd %in% c(1, 5, 10, 20, 30), label := as.character(sd)] %>%
-    plotXYBy("batch_size", "mean", by = "sd", box_padding = 0.05) +
+    plotXYBy("batch_size", "mean", by = "sd", label_nudge_x = 0, box_padding = 0.05) +
     labs(y = "Average treated share in 2nd batch")
 saveChart("avg-treated-share")
 

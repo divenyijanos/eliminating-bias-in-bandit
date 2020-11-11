@@ -1,8 +1,5 @@
 source("global.R")
 
-
-CHART_FORMAT <- "eps"
-
 te <- 1
 sd <- 10
 set.seed(sd * 10)

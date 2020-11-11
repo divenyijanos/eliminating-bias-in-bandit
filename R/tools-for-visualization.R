@@ -1,4 +1,4 @@
-plotXYBy <- function(dt, x, y, by, colors = NULL, size = 1, label_nudge_x = 5, box_padding = 0.5) {
+plotXYBy <- function(dt, x, y, by, colors = NULL, size = 1, label_nudge_x = 0, box_padding = 0.5) {
     if (is.null(colors)) {
         colors <- generateGradientColors(dt[, sort(unique(get(by)))])
     }
@@ -11,7 +11,7 @@ plotXYBy <- function(dt, x, y, by, colors = NULL, size = 1, label_nudge_x = 5, b
         ) +
         scale_color_manual(values = colors, guide = FALSE) +
         scale_x(x) +
-        labs(x = str_to_sentence(str_replace(x, "_", " ")))
+        lab_x(x)
 }
 
 scale_x <- function(x) {
@@ -21,9 +21,17 @@ scale_x <- function(x) {
             labels = scales::percent_format(accuracy = 1)
         ),
         batch_size = scale_x_continuous(
-            breaks = c(10, 1000, 2000, 5000, 10000), minor_breaks = BATCH_SIZES
+            breaks = c(10, 50, 500, 5000), minor_breaks = BATCH_SIZES, trans = "log"
         ),
         sd = scale_x_continuous(breaks = c(1, 5, 10, 20, 30), minor_breaks = SDS)
+    )
+}
+
+lab_x <- function(x) {
+    switch(x,
+        limit = labs(x = "Limit"),
+        batch_size = labs(x = "Batch size (log scale)"),
+        sd = labs(x = "Standard deviation")
     )
 }
 

@@ -1,5 +1,5 @@
 source("global.R")
-CHART_FORMAT <- "eps"
+
 SETUP_COLORS <- c(ETC = MAIN_COLOR, IPWE = DARK_SECONDARY_COLOR, `limited IPWE` = DARK_SECONDARY_COLOR, FBTE = THIRD_COLOR, TE = SECONDARY_COLOR)
 
 labelSetups <- function(setup_comparison, type = c("limit", "method")) {
@@ -26,6 +26,7 @@ createConvexHullData <- function(setup_comparison, chosen_setup, n = 10000) {
     .[order(mse)]
 }
 
+
 plotWelfareVsMSE <- function(setups, n = 10000, colors = SETUP_COLORS, mse_limits, legend_position) {
     ggplot(mapping = aes(welfare, mse, color = setup))  +
     geom_path(
@@ -43,7 +44,7 @@ plotWelfareVsMSE <- function(setups, n = 10000, colors = SETUP_COLORS, mse_limit
     scale_color_manual(values = colors, guide = FALSE) +
     scale_y_reverse() +
     coord_cartesian(ylim = mse_limits, xlim = c(n / 2, n)) +
-    labs(y = "MSE")
+    labs(x = "Welfare", y = "MSE")
 }
 
 # Illustration ----------------------------------------------------------------
@@ -62,7 +63,7 @@ putTogetherSetupsWithETC(10000, 10)[(batch_size == 1000 & limit == 0) | (batch_s
     scale_color_manual(values = TWO_COLOR_SCHEME) +
     scale_y_reverse() +
     coord_cartesian(ylim = c(3.7, 0), xlim = c(5000, 10000)) +
-    labs(y = "MSE") +
+    labs(x = "Welfare", y = "MSE") +
     theme(
         legend.title = element_blank(),
         legend.position = c(0.18, 0.14),
@@ -73,13 +74,16 @@ saveChart("illustration-welfare-vs-te-limited")
 
 # TS only
 setups <- putTogetherSetupsWithETC(10000, 10)[limit == 0 & setup == "TE"]
+ggplot(setups, aes(welfare, mse)) +
+    geom_blank() +
+    scale_y_reverse() +
+    coord_cartesian(ylim = c(1.5, 0), xlim = c(5000, 10000)) +
+    labs(x = "Welfare", y = "MSE")
+saveChart("illustration-welfare-vs-te-empty")
+
 ggplot(setups, aes(welfare, mse, color = setup, alpha = alpha)) +
     geom_path(aes(group = setup_detailed), size = 1) +
     geom_point(aes(shape = (bias < 0.02), size = batch_size)) +
-    geom_label_repel(
-        aes(label = label), box.padding = 1,
-        segment.size = 0.2, point.padding = 0.5, show.legend = FALSE, na.rm = TRUE
-    ) +
     annotate(
         "label", x = 5100, y = 1.4,
         label = "Biased estimates are hollow \nPoint size is proportional to batch size",
@@ -90,7 +94,7 @@ ggplot(setups, aes(welfare, mse, color = setup, alpha = alpha)) +
     scale_color_manual(values = SETUP_COLORS, guide = FALSE) +
     scale_y_reverse() +
     coord_cartesian(ylim = c(1.5, 0), xlim = c(5000, 10000)) +
-    labs(y = "MSE")
+    labs(x = "Welfare", y = "MSE")
 saveChart("illustration-welfare-vs-te-batch-size-te-only")
 
 
@@ -118,7 +122,7 @@ ggplot(setups, aes(welfare, mse, color = setup, alpha = alpha)) +
     scale_color_manual(values = SETUP_COLORS, guide = FALSE) +
     scale_y_reverse() +
     coord_cartesian(ylim = c(1.5, 0), xlim = c(5000, 10000)) +
-    labs(y = "MSE")
+    labs(x = "Welfare", y = "MSE (reversed)")
 saveChart("illustration-welfare-vs-te-batch-size")
 
 limited_setups <- putTogetherSetupsWithETC(10000, 10)[setup == "limited IPWE"] %>%
@@ -149,7 +153,7 @@ ggplot(limited_setups, aes(welfare, mse, color = setup, alpha = alpha))  +
     scale_color_manual(values = SETUP_COLORS, guide = FALSE) +
     scale_y_reverse() +
     coord_cartesian(ylim = c(1.5, 0), xlim = c(5000, 10000)) +
-    labs(y = "MSE")
+    labs(x = "Welfare", y = "MSE (reversed)")
 saveChart("illustration-welfare-vs-te-batch-size-limited")
 
 all_setups <- putTogetherSetupsWithETC(10000, 10)[!(setup %in% c("limited TE", "IPWE"))]
@@ -175,7 +179,7 @@ plotWelfareVsMSE(all_setups, mse_limits = c(1.5, 0)) +
 saveChart("illustration-welfare-vs-te-batch-size-full")
 
 # link by batch size
-# frontier: ~ mainly best batch size and play with limit -- do I show best batch size (with limit) anywhere?
+# frontier: ~ mainly best batch size and play with limit
 all_setups %>%
     .[setup == "limited IPWE", setup_detailed := paste("limited IPWE", batch_size)] %>%
     .[setup == "limited IPWE", max_mse := max(mse), by = batch_size] %>%

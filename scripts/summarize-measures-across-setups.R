@@ -13,17 +13,20 @@ Sys.sleep(1)
 
 source("global.R")
 
-params <- CJ(te = 1, n = 40000, sd = 10, batch_size = BATCH_SIZES)
-mclapply(seq(nrow(params)), function(run) {
-    try(generateInterimResults(
-        as.list(params[run]),
-        c(
-            "calculateTEBySetups",
-            "calculateMeansBySetups",
-            "calculateTreatedShareBySetups",
-            "calculateWelfareBySetups",
-            "calculateWelfareAccumulationBySetups"
-        ),
-        redo
-    ))
-})
+# walk(DISTRIBUTIONS, ~{
+    params <- CJ(te = 1, n = 2000, sd = 10, batch_size = BATCH_SIZES)
+    mclapply(seq(nrow(params)), function(run) {
+        try(generateInterimResults(
+            as.list(params[run]),
+            c(
+                "calculateTEBySetups",
+                "calculateMeansBySetups",
+                "calculateTreatedShareBySetups",
+                "calculateWelfareBySetups",
+                "calculateWelfareAccumulationBySetups"
+            ),
+            distribution = "normal",
+            redo
+        ))
+    })
+# })
